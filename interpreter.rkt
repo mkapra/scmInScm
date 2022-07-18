@@ -10,8 +10,31 @@
   (eq? (vector-ref mem n) t)
   )
 
+(define (i-number? n)
+  (tag? n 'number)
+  )
+
+(define (i-symbol? n)
+  (tag? n 'symbol)
+  )
+
 (define (i-pair? n)
   (tag? n 'pair)
+  )
+
+(define (i-null? n)
+  (tag? n 'null)
+  )
+
+(define (i-bool? n)
+  (tag? n 'bool)
+  )
+
+(define (symbol->name p)
+  (if (tag? p 'symbol)
+      (ref! p 1)
+      (error "Pointer is not a symbol")
+      )
   )
 
 (define (number->value p)
@@ -32,6 +55,12 @@
   (if (tag? p 'pair)
       (ref p 2)
       (error "Pointer is not a pair")
+      )
+  )
+
+(define (i-bool->value p)
+  (if (tag? p 'bool)
+      (ref p 1)
       )
   )
 
@@ -64,7 +93,14 @@
   (ref! ptr 1 v)
   ptr
   )
-        
+
+(define (i-bool v)
+  (define ptr (malloc 2))
+  (ref! ptr 0 'bool)
+  (ref! ptr 1 v)
+  ptr
+  )
+
 ;;;;;;;;;;;;;;;;;; Memory Dump ;;;;;;;;;;;;;;;;;;
 ;; Prints the content of the memory to the console in an understandable format
 (define (dumpMem)
@@ -146,6 +182,65 @@
   exit
   )
 
+;;;;;;;;;;;;;;;;;; Input ;;;;;;;;;;;;;;;;;;
+(define ptr (malloc 1))
+(ref! ptr 0 'null)
+(define i-null ptr)
+
+(define (expr->i-expr in)
+  (cond
+    ((pair? in)
+     (i-cons (expr->i-expr (car in)) (expr->i-expr (cdr in)))
+     )
+    
+    ((number? in)
+     (i-number in)
+     )
+    
+    ((symbol? in)
+     (i-symbol in)
+     )
+
+    ((boolean? in)
+     (i-bool in)
+     )
+
+    ((null? in)
+     i-null
+     )
+    )
+  )
+
+(define (i-read)
+  (expr->i-expr (read))
+  #t
+  )
+
+;;;;;;;;;;;;;;;;;; Output ;;;;;;;;;;;;;;;;;;
+(define (i-expr->expr p)
+  (cond
+    ((i-pair? p)
+     (cons (i-expr->expr (i-car p)) (i-expr->expr (i-cdr p)))
+     )
+    ((i-number? p)
+     (number->value p)
+     )
+    ((i-symbol? p)
+     (symbol->name p)
+     )
+    ((i-bool? p)
+     (i-bool->value p)
+     )
+    ((i-null? p)
+     '()
+     )
+    )
+  )
+
+(define (i-display p)
+  (i-expr->expr p)
+  )
+  
 ;;;;;;;;;;;;;;;;;; TESTS ;;;;;;;;;;;;;;;;;;
 ;; This function should throw an overflow error while trying (malloc 1)
 (define (mallocTest)
@@ -184,4 +279,6 @@
     )
   )
 
-(consTest)
+;;(consTest)
+(i-read)
+(dumpMem)
