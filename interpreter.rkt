@@ -240,6 +240,48 @@
 (define (i-display p)
   (i-expr->expr p)
   )
+
+;;;;;;;;;;;;;;;;;; Bindings and environment ;;;;;;;;;;;;;;;;;;
+(define i-epsilon (i-symbol 'epsilon))
+
+(define (new-binding symbol value compose)
+  (if (tag? symbol 'symbol)
+      (let ((p (malloc 4)))
+        (ref! p 0 'bind)
+        (ref! p 1 symbol)
+        (ref! p 2 value)
+        (ref! p 3 compose)
+        p
+        )
+      (error "symbol pointer is not a symbol")
+      )
+  )
+
+(define (binding->value symbol binding)
+  (if (tag? binding 'bind)
+      (let ((bindSymbol (ref binding 1)))
+        (cond ((eq? symbol bindSymbol)
+               (ref binding 2))
+              ((eq? (ref binding 3) i-epsilon)
+               #f)
+              (else (binding->value symbol (ref binding 3)))
+              )
+        )
+      (error "Pointer is not a binding")
+      )
+  )
+
+(define n1 (i-number 1))
+(define n2 (i-number 2))
+(define s1 (i-symbol 'number))
+(define s2 (i-symbol 'number))
+(define s3 (i-symbol 'number))
+
+(define b1 (new-binding s1 n1 i-epsilon))
+(define b2 (new-binding s2 n2 b1))
+
+(dumpMem)
+(binding->value s3 b2)
   
 ;;;;;;;;;;;;;;;;;; TESTS ;;;;;;;;;;;;;;;;;;
 ;; This function should throw an overflow error while trying (malloc 1)
@@ -280,5 +322,5 @@
   )
 
 ;;(consTest)
-(i-read)
-(dumpMem)
+;;(i-read)
+;;(dumpMem)
