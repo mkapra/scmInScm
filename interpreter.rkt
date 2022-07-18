@@ -264,25 +264,75 @@
                (ref binding 2))
               ((eq? (ref binding 3) i-epsilon)
                #f)
-              (else (binding->value symbol (ref binding 3)))
-              )
+              (else (binding->value symbol (ref binding 3))))
         )
       (error "Pointer is not a binding")
       )
   )
 
+(define (new-environment binding)
+  (if (or (tag? binding 'bind) (eq? binding i-epsilon))
+      (let ((ptr (malloc 2)))
+        (ref! ptr 0 'environment)
+        (ref! ptr 1 binding)
+        ptr
+        )
+      (error "Pointer is not a binding")
+      )
+  )
+
+(define (environment->binding env)
+  (if (tag? env 'environment)
+      (ref env 1)
+      (error "Pointer is not an environment")
+      )
+  )
+
+(define (environment-set! env binding)
+  (if (tag? env 'environment)
+      (ref! env 1 binding)
+      (error "Pointer is not an environment")
+      )
+  )
+
+(define (add-variable var value env)
+  (if (tag? env 'environment)
+      (let ((binding (ref env 1)))
+        (ref! env 1 (new-binding var value binding))
+        )
+      (error "Pointer is not an environment")
+      )
+  )
+
+(define (variable->value var env)
+  (binding->value var (ref env 1))
+  )
+
+(define i-environment i-epsilon)
+  
 (define n1 (i-number 1))
 (define n2 (i-number 2))
+(define n3 (i-number 3))
 (define s1 (i-symbol 'number))
 (define s2 (i-symbol 'number))
 (define s3 (i-symbol 'number))
+(define s4 (i-symbol 'number))
 
 (define b1 (new-binding s1 n1 i-epsilon))
 (define b2 (new-binding s2 n2 b1))
 
 (dumpMem)
-(binding->value s3 b2)
-  
+(define e1 (new-environment b2))
+(variable->value s1 e1)
+(add-variable s4 n3 e1)
+(variable->value s1 e1)
+
+(dumpMem)
+;; Should return false
+;;(binding->value s3 b2)
+;; Should return ptr to n2
+;;(binding->value s2 b2)
+
 ;;;;;;;;;;;;;;;;;; TESTS ;;;;;;;;;;;;;;;;;;
 ;; This function should throw an overflow error while trying (malloc 1)
 (define (mallocTest)
