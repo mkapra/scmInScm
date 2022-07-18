@@ -297,9 +297,7 @@
 
 (define (add-variable var value env)
   (if (tag? env 'environment)
-      (let ((binding (ref env 1)))
-        (ref! env 1 (new-binding var value binding))
-        )
+      (environment-set! env (new-binding var value (environment->binding env)))
       (error "Pointer is not an environment")
       )
   )
