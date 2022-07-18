@@ -308,7 +308,7 @@
   (binding->value var (ref env 1))
   )
 
-(define i-environment i-epsilon)
+(define i-environment (new-environment i-epsilon))
   
 (define n1 (i-number 1))
 (define n2 (i-number 2))
@@ -325,9 +325,8 @@
 (define e1 (new-environment b2))
 (variable->value s1 e1)
 (add-variable s4 n3 e1)
-(variable->value s1 e1)
-
-(dumpMem)
+(add-variable s4 n3 i-environment)
+(variable->value s4 e1)
 ;; Should return false
 ;;(binding->value s3 b2)
 ;; Should return ptr to n2
