@@ -302,7 +302,6 @@
          (loop (+ sum (number->value (i-eval env (i-car v))))
                (i-cdr v))
          sum))))
-
 (add-primitive '+ i-plus)
 
 ;;;;;;;;;;;;;;;;;; eval = apply ;;;;;;;;;;;;;;;;;;
@@ -356,22 +355,11 @@
 ;;;;;;;;;;;;;;;;;; Output ;;;;;;;;;;;;;;;;;;
 (define (i-expr->expr p)
   (cond
-    ((i-pair? p)
-     (cons (i-expr->expr (i-car p)) (i-expr->expr (i-cdr p)))
-     )
-    ((i-number? p)
-     (number->value p)
-     )
-    ((i-symbol? p)
-     (symbol->name p)
-     )
-    ((i-bool? p)
-     (i-bool->value p)
-     )
-    ((i-null? p)
-     '()
-     )
-    )
+    ((i-pair? p) (cons (i-expr->expr (i-car p)) (i-expr->expr (i-cdr p))))
+    ((i-number? p) (number->value p))
+    ((i-symbol? p) (symbol->name p))
+    ((i-bool? p) (i-bool->value p))
+    ((i-null? p) '()))
   )
 
 (define (i-display p)
