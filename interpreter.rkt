@@ -6,7 +6,7 @@
   (exit) ;; This function is undefined. Scheme will exit here
   )
 
-(define memSize 100)
+(define memSize 1000)
 
 ;; The memory where all the data is stored
 (define mem (make-vector memSize 0))
@@ -304,9 +304,15 @@
          sum))))
 (add-primitive '+ i-plus)
 
+(define (i-define env values)
+    (add-variable (i-car values) (i-car (i-cdr values)) i-environment)
+    (dumpMem)
+    i-undefined
+  )
+(add-primitive 'define i-define)
+
 ;;;;;;;;;;;;;;;;;; eval = apply ;;;;;;;;;;;;;;;;;;
 (define (i-eval env exp)
-  ;;(dumpMem)
   (cond ((tag? exp 'pair) (i-apply env (variable->value (i-car exp) env) (i-cdr exp)))
         ((tag? exp 'number) exp)
         ((i-bool? exp) exp)
@@ -329,6 +335,7 @@
     ((symbol? in) (i-symbol in))
     ((boolean? in) (i-bool in))
     ((null? in) i-null)
+    ((tag? in 'undefined) (if #f #t))
     )
   )
 
@@ -359,7 +366,8 @@
     ((i-number? p) (number->value p))
     ((i-symbol? p) (symbol->name p))
     ((i-bool? p) (i-bool->value p))
-    ((i-null? p) '()))
+    ((i-null? p) '())
+    (else ""))
   )
 
 (define (i-display p)
