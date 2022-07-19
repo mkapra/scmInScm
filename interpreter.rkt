@@ -1,3 +1,11 @@
+(define (error . messages)
+  (dumpMem)
+  (newline)
+  (for-each (lambda (x) (display x) (display " ")) messages)
+  (newline)
+  (exit) ;; This function is undefined. Scheme will exit here
+  )
+
 (define memSize 100)
 
 ;; The memory where all the data is stored
@@ -5,10 +13,32 @@
 ;; Pointer that points to the next free index in the memory vector
 (define free 0)
 
-;;;;;;;;;;;;;;;;;; Getter ;;;;;;;;;;;;;;;;;;
-(define (tag? n t)
-  (eq? (vector-ref mem n) t)
+;;;;;;;;;;;;;;;;;; Memory operations ;;;;;;;;;;;;;;;;;;
+(define (ref p i)
+  (vector-ref mem (+ p i))
   )
+
+(define (ref! p i v)
+  (vector-set! mem (+ p i) v)
+  )
+
+;; Allocates a specific amount (n) of memory in the vector
+;; This is simply done by increasing the free pointer
+(define (malloc n)
+  (if (> (+ n free 1) memSize)
+      (error "malloc" "Memory Overflow in malloc")
+      (begin
+        (ref! free 0 n)
+        (set! free (+ free n 1))
+        (- free n)
+        )
+      )
+  )
+
+;;;;;;;;;;;;;;;;;; Getter ;;;;;;;;;;;;;;;;;;
+(define (tag p) (ref p 0))
+(define (tag? n t) (eq? (vector-ref mem n) t))
+(define (tag! p t) (ref! p 0 t))
 
 (define (i-number? n)
   (tag? n 'number)
@@ -30,31 +60,35 @@
   (tag? n 'bool)
   )
 
+(define (i-primitive? n)
+  (tag? n 'primitiv)
+  )
+
 (define (symbol->name p)
   (if (tag? p 'symbol)
       (ref! p 1)
-      (error "Pointer is not a symbol")
+      (error "symbol->name" "Pointer is not a symbol")
       )
   )
 
 (define (number->value p)
   (if (tag? p 'number)
       (ref p 1)
-      (error "Pointer is not a number")
+      (error "number->value" "Pointer is not a number" p)
       )
   )
 
 (define (i-car p)
   (if (tag? p 'pair)
       (ref p 1)
-      (error "Pointer is not a pair")
+      (error "i-car" "Pointer is not a pair")
       )
   )
 
 (define (i-cdr p)
   (if (tag? p 'pair)
       (ref p 2)
-      (error "Pointer is not a pair")
+      (error "i-cdr" "Pointer is not a pair")
       )
   )
 
@@ -67,18 +101,34 @@
 (define (symbol->name p)
   (if (tag? p 'symbol)
       (ref p 1)
-      (error "Pointer is not a symbol")
+      (error "symbol->name" "Pointer is not a symbol")
       )
   )
 
 ;;;;;;;;;;;;;;;;;; Constructors ;;;;;;;;;;;;;;;;;;
-(define (i-number value)
+(define i-undefined
+  (let ((ptr (malloc 1)))
+    (tag! ptr 'undefined)
+    ptr
+    )
+  )
+
+(define i-null
+  (let ((ptr (malloc 1)))
+    (tag! ptr 'null)
+    ptr
+    )
+  )
+
+; numbers
+(define (new-number value)
   (define ptr (malloc 2))
   (ref! ptr 0 'number)
   (ref! ptr 1 value)
   ptr
   )
 
+; pairs
 (define (i-cons h t)
   (define ptr (malloc 3))
   (ref! ptr 0 'pair)
@@ -87,6 +137,7 @@
   ptr
   )
 
+; symbols
 (define (i-symbol v)
   (define ptr (malloc 2))
   (ref! ptr 0 'symbol)
@@ -94,6 +145,7 @@
   ptr
   )
 
+; booleans
 (define (i-bool v)
   (define ptr (malloc 2))
   (ref! ptr 0 'bool)
@@ -152,69 +204,154 @@
       )
   )
 
-;;;;;;;;;;;;;;;;;; Memory operations ;;;;;;;;;;;;;;;;;;
-(define (ref p i)
-  (vector-ref mem (+ p i))
-  )
+;;;;;;;;;;;;;;;;;; Bindings and environment ;;;;;;;;;;;;;;;;;;
+(define i-epsilon (i-symbol 'epsilon))
 
-(define (ref! p i v)
-  (vector-set! mem (+ p i) v)
-  )
-
-;; Allocates a specific amount (n) of memory in the vector
-;; This is simply done by increasing the free pointer
-(define (malloc n)
-  (if (> (+ n free 1) memSize)
-      (error "Memory Overflow in malloc")
-      (begin
-        (ref! free 0 n)
-        (set! free (+ free n 1))
-        (- free n)
+(define (new-binding symbol value compose)
+  (if (tag? symbol 'symbol)
+      (let ((p (malloc 4)))
+        (ref! p 0 'bind)
+        (ref! p 1 symbol)
+        (ref! p 2 value)
+        (ref! p 3 compose)
+        p
         )
+      (error "new-binding" "symbol pointer is not a symbol")
       )
   )
 
-(define (error e)
-  (newline)
-  (display "ERROR: ")
-  (display e)
-  (newline)
-  exit
+(define (binding->value symbol binding)
+  (if (tag? binding 'bind)
+      (let ((bindSymbol (ref binding 1)))
+        (cond ((eq? (symbol->name symbol) (symbol->name bindSymbol))
+               (ref binding 2))
+              ((eq? (ref binding 3) i-epsilon)
+               #f)
+              (else (binding->value symbol (ref binding 3))))
+        )
+      (error "binding->value" "Pointer is not a binding")
+      )
+  )
+
+(define (new-environment binding)
+  (if (or (tag? binding 'bind) (eq? binding i-epsilon))
+      (let ((ptr (malloc 2)))
+        (ref! ptr 0 'environment)
+        (ref! ptr 1 binding)
+        ptr
+        )
+      (error "new-environment" "Pointer is not a binding")
+      )
+  )
+
+(define (environment->binding env)
+  (if (tag? env 'environment)
+      (ref env 1)
+      (error "environment->binding" "Pointer is not an environment")
+      )
+  )
+
+(define (environment-set! env binding)
+  (if (tag? env 'environment)
+      (ref! env 1 binding)
+      (error "environment-set" "Pointer is not an environment")
+      )
+  )
+
+(define (add-variable var value env)
+  (if (tag? env 'environment)
+      (environment-set! env (new-binding var value (environment->binding env)))
+      (error "add-variable" "Pointer is not an environment")
+      )
+  )
+
+(define (variable->value var env) 
+  (binding->value var (ref env 1))
+  )
+
+(define i-environment (new-environment i-epsilon))
+
+(define (new-primitive f)
+  (let ((ptr (malloc 2)))
+    (ref! ptr 0 'primitiv)
+    (ref! ptr 1 f)
+    ptr
+    )
+  )
+
+(define (primitive->f p)
+  (if (i-primitive? p)
+      (ref p 1)
+      (error "primitive->f" "Pointer is not a primitive" p)
+      )
+  )
+
+(define (add-primitive name f)
+  (let ((s (i-symbol name))
+        (p (new-primitive f)))
+    (add-variable s p i-environment)
+    )
+  )
+
+;;;;;;;;;;;;;;;;;; Primitives ;;;;;;;;;;;;;;;;;;
+(define (i-plus env values) ; values ist eine i-scheme liste
+  (new-number
+   (let loop ((sum 0); Akumulator für die Summe
+              (v values)) ; Iteration  über die i-scheme liste
+     (if (eq? (tag v) 'pair)
+         (loop (+ sum (number->value (i-eval env (i-car v))))
+               (i-cdr v))
+         sum))))
+
+(add-primitive '+ i-plus)
+
+;;;;;;;;;;;;;;;;;; eval = apply ;;;;;;;;;;;;;;;;;;
+(define (i-eval env exp)
+  ;;(dumpMem)
+  (cond ((tag? exp 'pair) (i-apply env (variable->value (i-car exp) env) (i-cdr exp)))
+        ((tag? exp 'number) exp)
+        ((i-bool? exp) exp)
+        ((i-symbol? exp) (variable->value exp env))
+        )
+  )
+
+(define (i-apply env func arglist)
+  (if (i-primitive? func)
+      ((primitive->f func) env arglist)
+      (error "i-apply" "Pointer is not a primitive" func (tag func))
+      )
   )
 
 ;;;;;;;;;;;;;;;;;; Input ;;;;;;;;;;;;;;;;;;
-(define ptr (malloc 1))
-(ref! ptr 0 'null)
-(define i-null ptr)
-
 (define (expr->i-expr in)
   (cond
-    ((pair? in)
-     (i-cons (expr->i-expr (car in)) (expr->i-expr (cdr in)))
-     )
-    
-    ((number? in)
-     (i-number in)
-     )
-    
-    ((symbol? in)
-     (i-symbol in)
-     )
-
-    ((boolean? in)
-     (i-bool in)
-     )
-
-    ((null? in)
-     i-null
-     )
+    ((pair? in) (i-cons (expr->i-expr (car in)) (expr->i-expr (cdr in))))
+    ((number? in) (new-number in))
+    ((symbol? in) (i-symbol in))
+    ((boolean? in) (i-bool in))
+    ((null? in) i-null)
     )
   )
 
 (define (i-read)
   (expr->i-expr (read))
-  #t
   )
+
+
+(define (read-eval-print return)
+  (define (i-exit env values) (return 0))
+  (add-primitive 'exit i-exit)
+  (let loop ()
+    (newline)
+    (display "i-scheme> ")
+    (i-display (i-eval i-environment (i-read)))
+    (loop)))
+
+(define (i-scheme)
+  (display "This is i-scheme version 1.0")
+  (call-with-current-continuation read-eval-print)
+  (display "Bye!")
+  (newline))
 
 ;;;;;;;;;;;;;;;;;; Output ;;;;;;;;;;;;;;;;;;
 (define (i-expr->expr p)
@@ -238,97 +375,8 @@
   )
 
 (define (i-display p)
-  (i-expr->expr p)
+  (display (i-expr->expr p))
   )
-
-;;;;;;;;;;;;;;;;;; Bindings and environment ;;;;;;;;;;;;;;;;;;
-(define i-epsilon (i-symbol 'epsilon))
-
-(define (new-binding symbol value compose)
-  (if (tag? symbol 'symbol)
-      (let ((p (malloc 4)))
-        (ref! p 0 'bind)
-        (ref! p 1 symbol)
-        (ref! p 2 value)
-        (ref! p 3 compose)
-        p
-        )
-      (error "symbol pointer is not a symbol")
-      )
-  )
-
-(define (binding->value symbol binding)
-  (if (tag? binding 'bind)
-      (let ((bindSymbol (ref binding 1)))
-        (cond ((eq? symbol bindSymbol)
-               (ref binding 2))
-              ((eq? (ref binding 3) i-epsilon)
-               #f)
-              (else (binding->value symbol (ref binding 3))))
-        )
-      (error "Pointer is not a binding")
-      )
-  )
-
-(define (new-environment binding)
-  (if (or (tag? binding 'bind) (eq? binding i-epsilon))
-      (let ((ptr (malloc 2)))
-        (ref! ptr 0 'environment)
-        (ref! ptr 1 binding)
-        ptr
-        )
-      (error "Pointer is not a binding")
-      )
-  )
-
-(define (environment->binding env)
-  (if (tag? env 'environment)
-      (ref env 1)
-      (error "Pointer is not an environment")
-      )
-  )
-
-(define (environment-set! env binding)
-  (if (tag? env 'environment)
-      (ref! env 1 binding)
-      (error "Pointer is not an environment")
-      )
-  )
-
-(define (add-variable var value env)
-  (if (tag? env 'environment)
-      (environment-set! env (new-binding var value (environment->binding env)))
-      (error "Pointer is not an environment")
-      )
-  )
-
-(define (variable->value var env)
-  (binding->value var (ref env 1))
-  )
-
-(define i-environment (new-environment i-epsilon))
-  
-(define n1 (i-number 1))
-(define n2 (i-number 2))
-(define n3 (i-number 3))
-(define s1 (i-symbol 'number))
-(define s2 (i-symbol 'number))
-(define s3 (i-symbol 'number))
-(define s4 (i-symbol 'number))
-
-(define b1 (new-binding s1 n1 i-epsilon))
-(define b2 (new-binding s2 n2 b1))
-
-(dumpMem)
-(define e1 (new-environment b2))
-(variable->value s1 e1)
-(add-variable s4 n3 e1)
-(add-variable s4 n3 i-environment)
-(variable->value s4 e1)
-;; Should return false
-;;(binding->value s3 b2)
-;; Should return ptr to n2
-;;(binding->value s2 b2)
 
 ;;;;;;;;;;;;;;;;;; TESTS ;;;;;;;;;;;;;;;;;;
 ;; This function should throw an overflow error while trying (malloc 1)
@@ -356,9 +404,9 @@
   )
 
 (define (consTest)
-  (let* ((nr1 (i-number 200))
-         (nr2 (i-number 50))
-         (nr3 (i-number 70))
+  (let* ((nr1 (new-number 200))
+         (nr2 (new-number 50))
+         (nr3 (new-number 70))
          (p1 (i-cons nr1 nr2))
          (p2 (i-cons p1 nr3))
          )
@@ -368,6 +416,30 @@
     )
   )
 
-;;(consTest)
-;;(i-read)
-;;(dumpMem)
+(define (envTest)
+  (let ((n1 (new-number 1))
+        (n2 (new-number 2))
+        (n3 (new-number 3))
+        (s1 (i-symbol 'number))
+        (s2 (i-symbol 'number))
+        (s3 (i-symbol 'number))
+        (s4 (i-symbol 'number))
+
+        (b1 (new-binding s1 n1 i-epsilon))
+        (b2 (new-binding s2 n2 b1))
+        )
+    (dumpMem)
+    (define e1 (new-environment b2))
+    (variable->value s1 e1)
+    (add-variable s4 n3 e1)
+    (add-variable s4 n3 i-environment)
+    (variable->value s4 e1)
+    
+    ; Should return false
+    ;(binding->value s3 b2)
+    ; Should return ptr to n2
+    ;(binding->value s2 b2)
+    )
+  )
+
+(i-scheme)
