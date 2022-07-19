@@ -92,7 +92,7 @@
       )
   )
 
-(define (i-bool->value p)
+(define (bool->value p)
   (if (tag? p 'bool)
       (ref p 1)
       )
@@ -305,11 +305,18 @@
 (add-primitive '+ i-plus)
 
 (define (i-define env values)
-    (add-variable (i-car values) (i-car (i-cdr values)) i-environment)
-    (dumpMem)
-    i-undefined
+  (add-variable (i-car values) (i-car (i-cdr values)) i-environment)
+  (dumpMem)
+  i-undefined
   )
 (add-primitive 'define i-define)
+
+(define (i-if env exp)
+    (if (bool->value (i-eval env (i-car exp)))
+        (i-eval env (i-car (i-cdr exp)))
+        (i-eval env (i-car (i-cdr (i-cdr exp)))))
+  )
+(add-primitive 'if i-if)
 
 ;;;;;;;;;;;;;;;;;; eval = apply ;;;;;;;;;;;;;;;;;;
 (define (i-eval env exp)
@@ -342,7 +349,6 @@
 (define (i-read)
   (expr->i-expr (read))
   )
-
 
 (define (read-eval-print return)
   (define (i-exit env values) (return 0))
