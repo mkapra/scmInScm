@@ -81,7 +81,7 @@
 (define (i-car p)
   (if (tag? p 'pair)
       (ref p 1)
-      (error "i-car" "Pointer is not a pair")
+      (error "i-car" "Pointer is not a pair" p)
       )
   )
 
@@ -294,29 +294,96 @@
   )
 
 ;;;;;;;;;;;;;;;;;; Primitives ;;;;;;;;;;;;;;;;;;
-(define (i-plus env values) ; values ist eine i-scheme liste
+(define (i-plus env values)
   (new-number
-   (let loop ((sum 0); Akumulator für die Summe
-              (v values)) ; Iteration  über die i-scheme liste
+   (let loop ((sum 0)
+              (v values))
      (if (eq? (tag v) 'pair)
          (loop (+ sum (number->value (i-eval env (i-car v))))
                (i-cdr v))
          sum))))
 (add-primitive '+ i-plus)
 
+(define (i-minus env values)
+  (new-number
+   (let loop ((result 0)
+              (v values))
+     (if (eq? (tag v) 'pair)
+         (loop (- result (number->value (i-eval env (i-car v))))
+               (i-cdr v))
+         result))))
+(add-primitive '- i-minus)
+
+(define (i-mul env values)
+  (new-number
+   (let loop ((result 0)
+              (v values))
+     (if (eq? (tag v) 'pair)
+         (loop (* result (number->value (i-eval env (i-car v))))
+               (i-cdr v))
+         result))))
+(add-primitive '* i-mul)
+
+(define (i-div env values)
+  (new-number
+   (let loop ((result 0)
+              (v values))
+     (if (eq? (tag v) 'pair)
+         (loop (/ result (number->value (i-eval env (i-car v))))
+               (i-cdr v))
+         result))))
+(add-primitive '/ i-div)
+
 (define (i-define env values)
   (add-variable (i-car values) (i-car (i-cdr values)) i-environment)
-  (dumpMem)
   i-undefined
   )
 (add-primitive 'define i-define)
 
 (define (i-if env exp)
-    (if (bool->value (i-eval env (i-car exp)))
-        (i-eval env (i-car (i-cdr exp)))
-        (i-eval env (i-car (i-cdr (i-cdr exp)))))
+  (if (bool->value (i-eval env (i-car exp)))
+      (i-eval env (i-car (i-cdr exp)))
+      (if (eq? (i-cdr (i-cdr exp)) i-null)
+          i-undefined
+          (i-eval env (i-car (i-cdr (i-cdr exp)))))
+      )
   )
 (add-primitive 'if i-if)
+
+(define (i-not env exp)
+  (if (bool->value (i-eval env (i-car exp)))
+      (i-bool #f)
+      (i-bool #t)
+      )
+  )
+(add-primitive 'not i-not)
+
+(define (i-and env exp)
+  (if (bool->value (i-eval env (i-car exp)))
+      (if (eq? (i-cdr exp) i-null)
+          (i-bool #t)
+          (i-and env (i-cdr exp))
+          )
+      (i-car exp)
+      )
+  )
+(add-primitive 'and i-and)
+
+(define (i-or env exp)
+  (if (bool->value (i-eval env (i-car exp)))
+      (i-bool #t)
+      (if (eq? (i-cdr exp) i-null)
+          (i-bool #f)
+          (i-or env (i-cdr exp))
+          )
+      )
+  )
+(add-primitive 'or i-or)
+
+(define (i-quote env exp)
+  (display "Not implemented")
+  )
+(add-primitive 'quote i-quote)
 
 ;;;;;;;;;;;;;;;;;; eval = apply ;;;;;;;;;;;;;;;;;;
 (define (i-eval env exp)
@@ -371,7 +438,7 @@
     ((i-pair? p) (cons (i-expr->expr (i-car p)) (i-expr->expr (i-cdr p))))
     ((i-number? p) (number->value p))
     ((i-symbol? p) (symbol->name p))
-    ((i-bool? p) (i-bool->value p))
+    ((i-bool? p) (bool->value p))
     ((i-null? p) '())
     (else ""))
   )
