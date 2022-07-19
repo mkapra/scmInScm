@@ -301,6 +301,7 @@
   )
 
 ;;;;;;;;;;;;;;;;;; Primitives ;;;;;;;;;;;;;;;;;;
+;; +
 (define (i-plus env values)
   (new-number
    (let loop ((sum 0)
@@ -311,6 +312,7 @@
          sum))))
 (add-primitive '+ i-plus)
 
+;; -
 (define (i-minus env values)
   (new-number
    (let loop ((result 0)
@@ -321,6 +323,7 @@
          result))))
 (add-primitive '- i-minus)
 
+;; *
 (define (i-mul env values)
   (new-number
    (let loop ((result 0)
@@ -331,6 +334,7 @@
          result))))
 (add-primitive '* i-mul)
 
+;; /
 (define (i-div env values)
   (new-number
    (let loop ((result 0)
@@ -341,12 +345,14 @@
          result))))
 (add-primitive '/ i-div)
 
+;; define
 (define (i-define env values)
   (add-variable (i-car values) (i-eval env (i-car (i-cdr values))) i-environment)
   i-undefined
   )
 (add-primitive 'define i-define)
 
+;; if
 (define (i-if env exp)
   (if (bool->value (i-eval env (i-car exp)))
       (i-eval env (i-car (i-cdr exp)))
@@ -357,6 +363,7 @@
   )
 (add-primitive 'if i-if)
 
+;; not
 (define (i-not env exp)
   (if (bool->value (i-eval env (i-car exp)))
       (i-bool #f)
@@ -365,6 +372,7 @@
   )
 (add-primitive 'not i-not)
 
+;; and
 (define (i-and env exp)
   (if (bool->value (i-eval env (i-car exp)))
       (if (eq? (i-cdr exp) i-null)
@@ -376,6 +384,7 @@
   )
 (add-primitive 'and i-and)
 
+;; or
 (define (i-or env exp)
   (if (bool->value (i-eval env (i-car exp)))
       (i-bool #t)
@@ -387,6 +396,7 @@
   )
 (add-primitive 'or i-or)
 
+;; begin
 (define (i-begin env exp)
   (dumpMem)
   (let ((first (i-eval env (i-car exp))))
@@ -398,6 +408,7 @@
   )
 (add-primitive 'begin i-begin)
 
+;; cons
 (define (i-cons env exp)
   (if (eq? (i-cdr exp) i-null)
       (new-pair (i-eval env (i-car exp)) (i-cdr exp))
@@ -405,7 +416,8 @@
       )
   )
 (add-primitive 'cons i-cons)
-
+  
+;; quote
 (define (i-quote env exp)
   (display "Not implemented")
   )
@@ -471,70 +483,6 @@
 
 (define (i-display p)
   (display (i-expr->expr p))
-  )
-
-;;;;;;;;;;;;;;;;;; TESTS ;;;;;;;;;;;;;;;;;;
-;; This function should throw an overflow error while trying (malloc 1)
-(define (mallocTest)
-  (malloc 3)
-  (dumpMem)
-  (malloc 4)
-  (dumpMem)
-  (malloc 1)
-  (dumpMem)
-  )
-
-(define (setTest)
-  (define ptr (malloc 1))
-  (ref! ptr 0 'true)
-  (set! ptr (malloc 1))
-  (ref! ptr 0 'false)
-  (set! ptr (malloc 3))
-  (ref! ptr 0 'pair)
-  (ref! ptr 1 1)
-  (ref! ptr 2 2)
-  (set! ptr (malloc 1))
-  (ref! ptr 0 'false)
-  (dumpMem)
-  )
-
-(define (consTest)
-  (let* ((nr1 (new-number 200))
-         (nr2 (new-number 50))
-         (nr3 (new-number 70))
-         (p1 (new-pair nr1 nr2))
-         (p2 (new-pair p1 nr3))
-         )
-    (dumpMem)
-    ;;(display (number->value (i-car (i-car p2))))(newline)
-    ;;(display (number->value (i-cdr p2)))
-    )
-  )
-
-(define (envTest)
-  (let ((n1 (new-number 1))
-        (n2 (new-number 2))
-        (n3 (new-number 3))
-        (s1 (i-symbol 'number))
-        (s2 (i-symbol 'number))
-        (s3 (i-symbol 'number))
-        (s4 (i-symbol 'number))
-
-        (b1 (new-binding s1 n1 i-epsilon))
-        (b2 (new-binding s2 n2 b1))
-        )
-    (dumpMem)
-    (define e1 (new-environment b2))
-    (variable->value s1 e1)
-    (add-variable s4 n3 e1)
-    (add-variable s4 n3 i-environment)
-    (variable->value s4 e1)
-
-    ; Should return false
-    ;(binding->value s3 b2)
-    ; Should return ptr to n2
-    ;(binding->value s2 b2)
-    )
   )
 
 (i-scheme)
