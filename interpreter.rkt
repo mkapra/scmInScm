@@ -1,3 +1,4 @@
+;; Error function that takes an error and multiple messages. The error and the messages are printed to the console
 (define (error . messages)
   (dumpMem)
   (newline)
@@ -10,20 +11,25 @@
 
 ;; The memory where all the data is stored
 (define mem (make-vector memSize 0))
-;; Pointer that points to the next free index in the memory vector
+;; Pointer that points to the next free index in the memory
 (define free 0)
 
 ;;;;;;;;;;;;;;;;;; Memory operations ;;;;;;;;;;;;;;;;;;
+;; Get the value at the given index in the memory
 (define (ref p i)
   (vector-ref mem (+ p i))
   )
 
+;; Set the value at the given index in the memory
 (define (ref! p i v)
   (vector-set! mem (+ p i) v)
   )
 
-;; Allocates a specific amount (n) of memory in the vector
-;; This is simply done by increasing the free pointer
+;; Allocates a specific amount (n) of memory in the vector. This is simply done by increasing the free pointer. The
+;; return value is the index of the first element in the newly allocated memory.
+;;
+;; This function also sets the size of the block in a index before the resverved block. This causes the interpreter to
+;; allocate n + 1 chunks of memory. This makes it simpler for debugging and is hidden from the user.
 (define (malloc n)
   (if (> (+ n free 1) memSize)
       (error "malloc" "Memory Overflow in malloc")
@@ -36,10 +42,14 @@
   )
 
 ;;;;;;;;;;;;;;;;;; Getter ;;;;;;;;;;;;;;;;;;
+;; Returns the tag of the given address p
 (define (tag p) (ref p 0))
-(define (tag? n t) (eq? (vector-ref mem n) t))
+;; Returns if the tag matches the given tag t
+(define (tag? n t) (eq? (tag n) t))
+;; Sets the tag t on the given address p
 (define (tag! p t) (ref! p 0 t))
 
+;; Some type checks
 (define (i-number? n)
   (tag? n 'number)
   )
@@ -54,6 +64,10 @@
 
 (define (i-null? n)
   (tag? n 'null)
+  )
+
+(define (i-undefined? n)
+  (tag? n 'undefined)
   )
 
 (define (i-bool? n)
@@ -122,7 +136,7 @@
   )
 
 ; pairs
-(define (i-cons h t)
+(define (new-pair h t)
   (define ptr (malloc 3))
   (ref! ptr 0 'pair)
   (ref! ptr 1 h)
@@ -191,7 +205,7 @@
                   )
               )
             )
-        
+
         (dumpMemRek (+ i (vector-ref mem i) 1))
         )
       )
@@ -258,7 +272,7 @@
       )
   )
 
-(define (variable->value var env) 
+(define (variable->value var env)
   (binding->value var (ref env 1))
   )
 
@@ -328,7 +342,7 @@
 (add-primitive '/ i-div)
 
 (define (i-define env values)
-  (add-variable (i-car values) (i-car (i-cdr values)) i-environment)
+  (add-variable (i-car values) (i-eval env (i-car (i-cdr values))) i-environment)
   i-undefined
   )
 (add-primitive 'define i-define)
@@ -384,6 +398,14 @@
   )
 (add-primitive 'begin i-begin)
 
+(define (i-cons env exp)
+  (if (eq? (i-cdr exp) i-null)
+      (new-pair (i-eval env (i-car exp)) (i-cdr exp))
+      (new-pair (i-eval env (i-car exp)) (i-cons env (i-cdr exp)))
+      )
+  )
+(add-primitive 'cons i-cons)
+
 (define (i-quote env exp)
   (display "Not implemented")
   )
@@ -408,7 +430,7 @@
 ;;;;;;;;;;;;;;;;;; Input ;;;;;;;;;;;;;;;;;;
 (define (expr->i-expr in)
   (cond
-    ((pair? in) (i-cons (expr->i-expr (car in)) (expr->i-expr (cdr in))))
+    ((pair? in) (new-pair (expr->i-expr (car in)) (expr->i-expr (cdr in))))
     ((number? in) (new-number in))
     ((symbol? in) (i-symbol in))
     ((boolean? in) (i-bool in))
@@ -480,8 +502,8 @@
   (let* ((nr1 (new-number 200))
          (nr2 (new-number 50))
          (nr3 (new-number 70))
-         (p1 (i-cons nr1 nr2))
-         (p2 (i-cons p1 nr3))
+         (p1 (new-pair nr1 nr2))
+         (p2 (new-pair p1 nr3))
          )
     (dumpMem)
     ;;(display (number->value (i-car (i-car p2))))(newline)
@@ -507,7 +529,7 @@
     (add-variable s4 n3 e1)
     (add-variable s4 n3 i-environment)
     (variable->value s4 e1)
-    
+
     ; Should return false
     ;(binding->value s3 b2)
     ; Should return ptr to n2
