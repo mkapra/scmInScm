@@ -64,13 +64,6 @@
   (tag? n 'primitiv)
   )
 
-(define (symbol->name p)
-  (if (tag? p 'symbol)
-      (ref! p 1)
-      (error "symbol->name" "Pointer is not a symbol")
-      )
-  )
-
 (define (number->value p)
   (if (tag? p 'number)
       (ref p 1)
@@ -101,7 +94,7 @@
 (define (symbol->name p)
   (if (tag? p 'symbol)
       (ref p 1)
-      (error "symbol->name" "Pointer is not a symbol")
+      (error "symbol->name" "Pointer is not a symbol" p)
       )
   )
 
@@ -379,6 +372,17 @@
       )
   )
 (add-primitive 'or i-or)
+
+(define (i-begin env exp)
+  (dumpMem)
+  (let ((first (i-eval env (i-car exp))))
+    (if (eq? (i-cdr exp) i-null)
+        first
+        (i-begin env (i-cdr exp))
+        )
+    )
+  )
+(add-primitive 'begin i-begin)
 
 (define (i-quote env exp)
   (display "Not implemented")
