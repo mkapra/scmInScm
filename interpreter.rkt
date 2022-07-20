@@ -85,17 +85,17 @@
       )
   )
 
-(define (i-car p)
+(define (pair->car p)
   (if (tag? p 'pair)
       (ref p 1)
-      (error "i-car" "Pointer is not a pair" p)
+      (error "pair->car" "Pointer is not a pair" p)
       )
   )
 
-(define (i-cdr p)
+(define (pair->cdr p)
   (if (tag? p 'pair)
       (ref p 2)
-      (error "i-cdr" "Pointer is not a pair")
+      (error "pair->cdr" "Pointer is not a pair")
       )
   )
 
@@ -307,8 +307,8 @@
    (let loop ((sum 0)
               (v values))
      (if (eq? (tag v) 'pair)
-         (loop (+ sum (number->value (i-eval env (i-car v))))
-               (i-cdr v))
+         (loop (+ sum (number->value (i-eval env (pair->car v))))
+               (pair->cdr v))
          sum))))
 (add-primitive '+ i-plus)
 
@@ -318,8 +318,8 @@
    (let loop ((result 0)
               (v values))
      (if (eq? (tag v) 'pair)
-         (loop (- result (number->value (i-eval env (i-car v))))
-               (i-cdr v))
+         (loop (- result (number->value (i-eval env (pair->car v))))
+               (pair->cdr v))
          result))))
 (add-primitive '- i-minus)
 
@@ -329,8 +329,8 @@
    (let loop ((result 0)
               (v values))
      (if (eq? (tag v) 'pair)
-         (loop (* result (number->value (i-eval env (i-car v))))
-               (i-cdr v))
+         (loop (* result (number->value (i-eval env (pair->car v))))
+               (pair->cdr v))
          result))))
 (add-primitive '* i-mul)
 
@@ -340,32 +340,32 @@
    (let loop ((result 0)
               (v values))
      (if (eq? (tag v) 'pair)
-         (loop (/ result (number->value (i-eval env (i-car v))))
-               (i-cdr v))
+         (loop (/ result (number->value (i-eval env (pair->car v))))
+               (pair->cdr v))
          result))))
 (add-primitive '/ i-div)
 
 ;; define
 (define (i-define env values)
-  (add-variable (i-car values) (i-eval env (i-car (i-cdr values))) i-environment)
+  (add-variable (pair->car values) (i-eval env (pair->car (pair->cdr values))) i-environment)
   i-undefined
   )
 (add-primitive 'define i-define)
 
 ;; if
 (define (i-if env exp)
-  (if (bool->value (i-eval env (i-car exp)))
-      (i-eval env (i-car (i-cdr exp)))
-      (if (eq? (i-cdr (i-cdr exp)) i-null)
+  (if (bool->value (i-eval env (pair->car exp)))
+      (i-eval env (pair->car (pair->cdr exp)))
+      (if (eq? (pair->cdr (pair->cdr exp)) i-null)
           i-undefined
-          (i-eval env (i-car (i-cdr (i-cdr exp)))))
+          (i-eval env (pair->car (pair->cdr (pair->cdr exp)))))
       )
   )
 (add-primitive 'if i-if)
 
 ;; not
 (define (i-not env exp)
-  (if (bool->value (i-eval env (i-car exp)))
+  (if (bool->value (i-eval env (pair->car exp)))
       (i-bool #f)
       (i-bool #t)
       )
@@ -374,23 +374,23 @@
 
 ;; and
 (define (i-and env exp)
-  (if (bool->value (i-eval env (i-car exp)))
-      (if (eq? (i-cdr exp) i-null)
+  (if (bool->value (i-eval env (pair->car exp)))
+      (if (eq? (pair->cdr exp) i-null)
           (i-bool #t)
-          (i-and env (i-cdr exp))
+          (i-and env (pair->cdr exp))
           )
-      (i-car exp)
+      (pair->car exp)
       )
   )
 (add-primitive 'and i-and)
 
 ;; or
 (define (i-or env exp)
-  (if (bool->value (i-eval env (i-car exp)))
+  (if (bool->value (i-eval env (pair->car exp)))
       (i-bool #t)
-      (if (eq? (i-cdr exp) i-null)
+      (if (eq? (pair->cdr exp) i-null)
           (i-bool #f)
-          (i-or env (i-cdr exp))
+          (i-or env (pair->cdr exp))
           )
       )
   )
@@ -399,10 +399,10 @@
 ;; begin
 (define (i-begin env exp)
   (dumpMem)
-  (let ((first (i-eval env (i-car exp))))
-    (if (eq? (i-cdr exp) i-null)
+  (let ((first (i-eval env (pair->car exp))))
+    (if (eq? (pair->cdr exp) i-null)
         first
-        (i-begin env (i-cdr exp))
+        (i-begin env (pair->cdr exp))
         )
     )
   )
@@ -410,13 +410,25 @@
 
 ;; cons
 (define (i-cons env exp)
-  (if (eq? (i-cdr exp) i-null)
-      (new-pair (i-eval env (i-car exp)) (i-cdr exp))
-      (new-pair (i-eval env (i-car exp)) (i-cons env (i-cdr exp)))
+  (if (eq? (pair->cdr exp) i-null)
+      (new-pair (i-eval env (pair->car exp)) (pair->cdr exp))
+      (new-pair (i-eval env (pair->car exp)) (i-cons env (pair->cdr exp)))
       )
   )
 (add-primitive 'cons i-cons)
-  
+
+;; car
+(define (i-car env exp)
+  (pair->car (i-eval env (pair->car exp)))
+  )
+(add-primitive 'car i-car)
+
+;; cdr
+(define (i-cdr env exp)
+  (pair->cdr (i-eval env (pair->car exp)))
+  )
+(add-primitive 'cdr i-cdr)
+
 ;; quote
 (define (i-quote env exp)
   (display "Not implemented")
@@ -425,7 +437,7 @@
 
 ;;;;;;;;;;;;;;;;;; eval = apply ;;;;;;;;;;;;;;;;;;
 (define (i-eval env exp)
-  (cond ((tag? exp 'pair) (i-apply env (variable->value (i-car exp) env) (i-cdr exp)))
+  (cond ((tag? exp 'pair) (i-apply env (variable->value (pair->car exp) env) (pair->cdr exp)))
         ((tag? exp 'number) exp)
         ((i-bool? exp) exp)
         ((i-symbol? exp) (variable->value exp env))
@@ -473,7 +485,7 @@
 ;;;;;;;;;;;;;;;;;; Output ;;;;;;;;;;;;;;;;;;
 (define (i-expr->expr p)
   (cond
-    ((i-pair? p) (cons (i-expr->expr (i-car p)) (i-expr->expr (i-cdr p))))
+    ((i-pair? p) (cons (i-expr->expr (pair->car p)) (i-expr->expr (pair->cdr p))))
     ((i-number? p) (number->value p))
     ((i-symbol? p) (symbol->name p))
     ((i-bool? p) (bool->value p))
