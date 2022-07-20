@@ -78,6 +78,10 @@
   (tag? n 'primitiv)
   )
 
+(define (i-lambda? n)
+  (tag? n 'lambda)
+  )
+
 (define (number->value p)
   (if (tag? p 'number)
       (ref p 1)
@@ -109,6 +113,28 @@
   (if (tag? p 'symbol)
       (ref p 1)
       (error "symbol->name" "Pointer is not a symbol" p)
+      )
+  )
+
+;; lambda
+(define (lambda->arglist p)
+  (if (i-lambda? p)
+      (ref p 1)
+      (error "lambda->arglist" "Pointer is not a lambda" p)
+      )
+  )
+
+(define (lambda->body p)
+  (if (i-lambda? p)
+      (ref p 2)
+      (error "lambda->body" "Pointer is not a lambda" p)
+      )
+  )
+
+(define (lambda->env p)
+  (if (i-lambda? p)
+      (ref p 3)
+      (error "lambda->env" "Pointer is not a lambda" p)
       )
   )
 
@@ -158,6 +184,17 @@
   (ref! ptr 0 'bool)
   (ref! ptr 1 v)
   ptr
+  )
+
+; lambda
+(define (new-lambda arglist body env)
+  (let ((ptr (malloc 4)))
+    (ref! ptr 0 'lambda)
+    (ref! ptr 1 arglist)
+    (ref! ptr 2 body)
+    (ref! ptr 3 env)
+    ptr
+    )
   )
 
 ;;;;;;;;;;;;;;;;;; Memory Dump ;;;;;;;;;;;;;;;;;;
@@ -300,6 +337,23 @@
     )
   )
 
+(define (add-parameters param-list expr-list call-env env)
+  (let loop ((params param-list)
+             (exprs expr-list))
+    (add-variable (pair->car params) (i-eval call-env (pair->car exprs)) env)
+    (if (not (= (pair->cdr params) i-null))
+        (loop (pair->cdr params) (pair->cdr exprs))
+        )
+    )
+  )
+
+(define (new-lambda-environment param-list expr-list call-env def-env)
+  (let ((new-env (new-environment (environment->binding def-env))))
+    (add-parameters param-list expr-list call-env new-env)
+    new-env
+    )
+  )
+
 ;;;;;;;;;;;;;;;;;; Primitives ;;;;;;;;;;;;;;;;;;
 ;; +
 (define (i-plus env values)
@@ -314,13 +368,7 @@
 
 ;; -
 (define (i-minus env values)
-  (new-number
-   (let loop ((result 0)
-              (v values))
-     (if (eq? (tag v) 'pair)
-         (loop (- result (number->value (i-eval env (pair->car v))))
-               (pair->cdr v))
-         result))))
+  (new-number (- (number->value (pair->car values)) (number->value (i-plus env (pair->cdr values))))))
 (add-primitive '- i-minus)
 
 ;; *
@@ -347,7 +395,7 @@
 
 ;; define
 (define (i-define env values)
-  (add-variable (pair->car values) (i-eval env (pair->car (pair->cdr values))) i-environment)
+  (add-variable (pair->car values) (i-eval env (pair->car (pair->cdr values))) env)
   i-undefined
   )
 (add-primitive 'define i-define)
@@ -398,7 +446,6 @@
 
 ;; begin
 (define (i-begin env exp)
-  (dumpMem)
   (let ((first (i-eval env (pair->car exp))))
     (if (eq? (pair->cdr exp) i-null)
         first
@@ -418,20 +465,20 @@
 (add-primitive 'cons i-cons)
 
 ;; car
-(define (i-car env exp)
-  (pair->car (i-eval env (pair->car exp)))
-  )
+(define (i-car env exp) (pair->car (i-eval env (pair->car exp))))
 (add-primitive 'car i-car)
-
 ;; cdr
-(define (i-cdr env exp)
-  (pair->cdr (i-eval env (pair->car exp)))
-  )
+(define (i-cdr env exp) (pair->cdr (i-eval env (pair->car exp))))
 (add-primitive 'cdr i-cdr)
+
+;; i-lambda
+(define (i-lambda env values)
+  (new-lambda (pair->car values) (pair->cdr values) env))
+(add-primitive 'lambda i-lambda)
 
 ;; quote
 (define (i-quote env exp)
-  (display "Not implemented")
+  (pair->car exp)
   )
 (add-primitive 'quote i-quote)
 
@@ -445,10 +492,12 @@
   )
 
 (define (i-apply env func arglist)
-  (if (i-primitive? func)
-      ((primitive->f func) env arglist)
-      (error "i-apply" "Pointer is not a primitive" func (tag func))
-      )
+  (cond ((i-primitive? func) ((primitive->f func) env arglist))
+        ((i-lambda? func) (let loop ((func-env (new-lambda-environment (lambda->arglist func) arglist env (lambda->env func))) (exp (lambda->body func)))
+                            (cond
+                              ((eq? (pair->cdr exp) i-null) (i-eval func-env (pair->car exp)))
+                              (else (i-eval func-env (pair->car exp)) (loop func-env (pair->cdr exp))))))
+        )
   )
 
 ;;;;;;;;;;;;;;;;;; Input ;;;;;;;;;;;;;;;;;;
@@ -459,7 +508,7 @@
     ((symbol? in) (i-symbol in))
     ((boolean? in) (i-bool in))
     ((null? in) i-null)
-    ((tag? in 'undefined) (if #f #t))
+    ((i-undefined?) (if #f #t))
     )
   )
 
@@ -485,6 +534,7 @@
 ;;;;;;;;;;;;;;;;;; Output ;;;;;;;;;;;;;;;;;;
 (define (i-expr->expr p)
   (cond
+    ((i-lambda? p) "#<procedure:>") ;;(lambda (lambda->arglist p) (lambda->body p)))
     ((i-pair? p) (cons (i-expr->expr (pair->car p)) (i-expr->expr (pair->cdr p))))
     ((i-number? p) (number->value p))
     ((i-symbol? p) (symbol->name p))
