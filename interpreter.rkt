@@ -223,11 +223,9 @@
                 (display " ")
                 (set! i (+ i 1))
                 )
-              argAmount)
-    )
+              argAmount))
   (newline)
   )
-
 
 (define (dumpMemRek i)
   (if (not (>= i memSize))
@@ -255,6 +253,8 @@
 ;;;;;;;;;;;;;;;;;; Bindings and environment ;;;;;;;;;;;;;;;;;;
 (define i-epsilon (i-symbol 'epsilon))
 
+;; Creates a new binding in the memory. compose is the binding that should
+;; be appended to the generated binding
 (define (new-binding symbol value compose)
   (if (i-symbol? symbol)
       (let ((p (malloc 4)))
@@ -268,6 +268,7 @@
       )
   )
 
+;; Searches for a symbol in a list of bindings beginning at binding
 (define (binding->value symbol binding)
   (if (i-binding? binding)
       (let ((bindSymbol (ref binding 1)))
@@ -280,6 +281,7 @@
       )
   )
 
+;; Creates a new environment with an initial binding
 (define (new-environment binding)
   (if (or (i-binding? binding) (eq? binding i-epsilon))
       (let ((ptr (malloc 2)))
@@ -291,6 +293,7 @@
       )
   )
 
+;; Returns the first binding which the environment env references to
 (define (environment->binding env)
   (if (i-environment? env)
       (ref env 1)
@@ -305,6 +308,7 @@
       )
   )
 
+;; Adds a new binding to the environment containing the variable var and the value value
 (define (add-variable var value env)
   (if (i-environment? env)
       (environment-set! env (new-binding var value (environment->binding env)))
@@ -316,8 +320,10 @@
   (binding->value var (ref env 1))
   )
 
+;; Global environment of the interpreter
 (define i-environment (new-environment i-epsilon))
 
+;; Creates a new primitive function f in the memory
 (define (new-primitive f)
   (let ((ptr (malloc 2)))
     (ref! ptr 0 'primitiv)
@@ -326,6 +332,7 @@
     )
   )
 
+;; Returns the extracted primitive function from the memory
 (define (primitive->f p)
   (if (i-primitive? p)
       (ref p 1)
@@ -333,13 +340,12 @@
       )
   )
 
-(define (add-primitive name f)
-  (let ((s (i-symbol name))
-        (p (new-primitive f)))
-    (add-variable s p i-environment)
-    )
-  )
+;; Creates a new primitive with name name and function f and stores the pointer in a binding of
+;; the environment
+(define (add-primitive name f) (add-variable (i-symbol name) (new-primitive f) i-environment))
 
+;; Evaluates the given expressions and adds them to the env environment.
+;; For the evaluation the call-env environment is used.
 (define (add-parameters param-list expr-list call-env env)
   (let loop ((params param-list)
              (exprs expr-list))
@@ -350,6 +356,8 @@
     )
   )
 
+;; Generates a new environment for a lambda function. This environment contains the evaluated
+;; arguments of the function.
 (define (new-lambda-environment param-list expr-list call-env def-env)
   (let ((new-env (new-environment (environment->binding def-env))))
     (add-parameters param-list expr-list call-env new-env)
