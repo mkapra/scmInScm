@@ -1,4 +1,5 @@
-;; Error function that takes an error and multiple messages. The error and the messages are printed to the console
+;; Error function that takes an error and multiple messages. The error
+;; and the messages are printed to the console
 (define (error . messages)
   (dumpMem)
   (newline)
@@ -25,11 +26,14 @@
   (vector-set! mem (+ p i) v)
   )
 
-;; Allocates a specific amount (n) of memory in the vector. This is simply done by increasing the free pointer. The
-;; return value is the index of the first element in the newly allocated memory.
+;; Allocates a specific amount (n) of memory in the vector. This is
+;; simply done by increasing the free pointer. The return value is
+;; the index of the first element in the newly allocated memory.
 ;;
-;; This function also sets the size of the block in a index before the resverved block. This causes the interpreter to
-;; allocate n + 1 chunks of memory. This makes it simpler for debugging and is hidden from the user.
+;; This function also sets the size of the block in a index before
+;; the resverved block. This causes the interpreter to allocate n + 1
+;; chunks of memory. This makes it simpler for debugging and is hidden
+;; from the user.
 (define (malloc n)
   (if (> (+ n free 1) memSize)
       (error "malloc" "Memory Overflow in malloc")
@@ -238,7 +242,8 @@
             (begin
               (display tagIndex) (display ": ") (display (vector-ref mem tagIndex))
 
-              ;; Print args only if they exist (this is the case if the recLen is greater than 1)
+              ;; Print args only if they exist
+              ;; (this is the case if the recLen is greater than 1)
               (if (or (> recLen 1))
                   (dumpObjArgs argBegin argEnd)
                   (newline))
@@ -308,7 +313,8 @@
       )
   )
 
-;; Adds a new binding to the environment containing the variable var and the value value
+;; Adds a new binding to the environment containing the variable var
+;; and the value value
 (define (add-variable var value env)
   (if (i-environment? env)
       (environment-set! env (new-binding var value (environment->binding env)))
@@ -340,9 +346,10 @@
       )
   )
 
-;; Creates a new primitive with name name and function f and stores the pointer in a binding of
-;; the environment
-(define (add-primitive name f) (add-variable (i-symbol name) (new-primitive f) i-environment))
+;; Creates a new primitive with name name and function f and stores
+;; the pointer in a binding of the environment
+(define (add-primitive name f)
+  (add-variable (i-symbol name) (new-primitive f) i-environment))
 
 ;; Evaluates the given expressions and adds them to the env environment.
 ;; For the evaluation the call-env environment is used.
@@ -356,8 +363,8 @@
     )
   )
 
-;; Generates a new environment for a lambda function. This environment contains the evaluated
-;; arguments of the function.
+;; Generates a new environment for a lambda function. This environment contains
+;; the evaluated arguments of the function.
 (define (new-lambda-environment param-list expr-list call-env def-env)
   (let ((new-env (new-environment (environment->binding def-env))))
     (add-parameters param-list expr-list call-env new-env)
@@ -379,7 +386,8 @@
 
 ;; -
 (define (i-minus env values)
-  (new-number (- (number->value (pair->car values)) (number->value (i-plus env (pair->cdr values))))))
+  (new-number (- (number->value (pair->car values))
+                 (number->value (i-plus env (pair->cdr values))))))
 (add-primitive '- i-minus)
 
 ;; *
@@ -503,10 +511,11 @@
 (define (i-apply env func arglist)
   (cond
     ((i-primitive? func) ((primitive->f func) env arglist))
-    ((i-lambda? func) (let loop ((func-env (new-lambda-environment (lambda->arglist func) arglist env (lambda->env func))) (exp (lambda->body func)))
-                        (cond
-                          ((eq? (pair->cdr exp) i-null) (i-eval func-env (pair->car exp)))
-                          (else (i-eval func-env (pair->car exp)) (loop func-env (pair->cdr exp)))))))
+    ((i-lambda? func)
+     (let loop ((func-env (new-lambda-environment (lambda->arglist func) arglist env (lambda->env func))) (exp (lambda->body func)))
+       (cond
+         ((eq? (pair->cdr exp) i-null) (i-eval func-env (pair->car exp)))
+         (else (i-eval func-env (pair->car exp)) (loop func-env (pair->cdr exp)))))))
   )
 
 ;;;;;;;;;;;;;;;;;; Input ;;;;;;;;;;;;;;;;;;
@@ -542,7 +551,7 @@
 ;;;;;;;;;;;;;;;;;; Output ;;;;;;;;;;;;;;;;;;
 (define (i-expr->expr p)
   (cond
-    ((i-lambda? p) (string-append "#<procedure:" (symbol->string (symbol->name (ref 1 (environment->binding i-environment)))) ">"))
+    ((i-lambda? p) "#<procedure>")
     ((i-pair? p) (cons (i-expr->expr (pair->car p)) (i-expr->expr (pair->cdr p))))
     ((i-number? p) (number->value p))
     ((i-symbol? p) (symbol->name p))
