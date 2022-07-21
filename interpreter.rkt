@@ -534,7 +534,7 @@
 ;;;;;;;;;;;;;;;;;; Output ;;;;;;;;;;;;;;;;;;
 (define (i-expr->expr p)
   (cond
-    ((i-lambda? p) "#<procedure:>") ;;(lambda (lambda->arglist p) (lambda->body p)))
+    ((i-lambda? p) (string-append "#<procedure:" (symbol->string (symbol->name (ref 1 (environment->binding i-environment)))) ">"))
     ((i-pair? p) (cons (i-expr->expr (pair->car p)) (i-expr->expr (pair->cdr p))))
     ((i-number? p) (number->value p))
     ((i-symbol? p) (symbol->name p))
