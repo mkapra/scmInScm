@@ -82,6 +82,14 @@
   (tag? n 'lambda)
   )
 
+(define (i-binding? n)
+  (tag? n 'bind)
+  )
+
+(define (i-environment? n)
+  (tag? n 'environment)
+  )
+
 (define (number->value p)
   (if (tag? p 'number)
       (ref p 1)
@@ -209,8 +217,7 @@
 (define (dumpObjArgs begin end)
   (display " - ")
   (let ((i 0)
-        (argAmount (vector->list (make-vector (+ 1 (- end begin)))))
-        )
+        (argAmount (vector->list (make-vector (+ 1 (- end begin))))))
     (for-each (lambda (x)
                 (display (vector-ref mem (+ begin i)))
                 (display " ")
@@ -233,13 +240,10 @@
             (begin
               (display tagIndex) (display ": ") (display (vector-ref mem tagIndex))
 
-              ;; Print args only if they exist (this is the case if the recLen is greater than 1
+              ;; Print args only if they exist (this is the case if the recLen is greater than 1)
               (if (or (> recLen 1))
                   (dumpObjArgs argBegin argEnd)
-                  (begin
-                    (newline)
-                    )
-                  )
+                  (newline))
               )
             )
 
@@ -252,7 +256,7 @@
 (define i-epsilon (i-symbol 'epsilon))
 
 (define (new-binding symbol value compose)
-  (if (tag? symbol 'symbol)
+  (if (i-symbol? symbol)
       (let ((p (malloc 4)))
         (ref! p 0 'bind)
         (ref! p 1 symbol)
@@ -265,20 +269,19 @@
   )
 
 (define (binding->value symbol binding)
-  (if (tag? binding 'bind)
+  (if (i-binding? binding)
       (let ((bindSymbol (ref binding 1)))
-        (cond ((eq? (symbol->name symbol) (symbol->name bindSymbol))
-               (ref binding 2))
-              ((eq? (ref binding 3) i-epsilon)
-               #f)
-              (else (binding->value symbol (ref binding 3))))
+        (cond
+          ((eq? (symbol->name symbol) (symbol->name bindSymbol)) (ref binding 2))
+          ((eq? (ref binding 3) i-epsilon) #f)
+          (else (binding->value symbol (ref binding 3))))
         )
       (error "binding->value" "Pointer is not a binding")
       )
   )
 
 (define (new-environment binding)
-  (if (or (tag? binding 'bind) (eq? binding i-epsilon))
+  (if (or (i-binding? binding) (eq? binding i-epsilon))
       (let ((ptr (malloc 2)))
         (ref! ptr 0 'environment)
         (ref! ptr 1 binding)
@@ -289,21 +292,21 @@
   )
 
 (define (environment->binding env)
-  (if (tag? env 'environment)
+  (if (i-environment? env)
       (ref env 1)
       (error "environment->binding" "Pointer is not an environment")
       )
   )
 
 (define (environment-set! env binding)
-  (if (tag? env 'environment)
+  (if (i-environment? env)
       (ref! env 1 binding)
       (error "environment-set" "Pointer is not an environment")
       )
   )
 
 (define (add-variable var value env)
-  (if (tag? env 'environment)
+  (if (i-environment? env)
       (environment-set! env (new-binding var value (environment->binding env)))
       (error "add-variable" "Pointer is not an environment")
       )
@@ -477,27 +480,25 @@
 (add-primitive 'lambda i-lambda)
 
 ;; quote
-(define (i-quote env exp)
-  (pair->car exp)
-  )
+(define (i-quote env exp) (pair->car exp))
 (add-primitive 'quote i-quote)
 
 ;;;;;;;;;;;;;;;;;; eval = apply ;;;;;;;;;;;;;;;;;;
 (define (i-eval env exp)
-  (cond ((tag? exp 'pair) (i-apply env (variable->value (pair->car exp) env) (pair->cdr exp)))
-        ((tag? exp 'number) exp)
-        ((i-bool? exp) exp)
-        ((i-symbol? exp) (variable->value exp env))
-        )
+  (cond
+    ((tag? exp 'pair) (i-apply env (variable->value (pair->car exp) env) (pair->cdr exp)))
+    ((tag? exp 'number) exp)
+    ((i-bool? exp) exp)
+    ((i-symbol? exp) (variable->value exp env)))
   )
 
 (define (i-apply env func arglist)
-  (cond ((i-primitive? func) ((primitive->f func) env arglist))
-        ((i-lambda? func) (let loop ((func-env (new-lambda-environment (lambda->arglist func) arglist env (lambda->env func))) (exp (lambda->body func)))
-                            (cond
-                              ((eq? (pair->cdr exp) i-null) (i-eval func-env (pair->car exp)))
-                              (else (i-eval func-env (pair->car exp)) (loop func-env (pair->cdr exp))))))
-        )
+  (cond
+    ((i-primitive? func) ((primitive->f func) env arglist))
+    ((i-lambda? func) (let loop ((func-env (new-lambda-environment (lambda->arglist func) arglist env (lambda->env func))) (exp (lambda->body func)))
+                        (cond
+                          ((eq? (pair->cdr exp) i-null) (i-eval func-env (pair->car exp)))
+                          (else (i-eval func-env (pair->car exp)) (loop func-env (pair->cdr exp)))))))
   )
 
 ;;;;;;;;;;;;;;;;;; Input ;;;;;;;;;;;;;;;;;;
@@ -508,8 +509,7 @@
     ((symbol? in) (i-symbol in))
     ((boolean? in) (i-bool in))
     ((null? in) i-null)
-    ((i-undefined?) (if #f #t))
-    )
+    ((i-undefined?) (if #f #t)))
   )
 
 (define (i-read)
@@ -543,8 +543,7 @@
     (else ""))
   )
 
-(define (i-display p)
-  (display (i-expr->expr p))
-  )
+(define (i-display p) (display (i-expr->expr p)))
 
+;; Call entry function of interpreter
 (i-scheme)
