@@ -385,8 +385,8 @@
 ;; /
 (define (i-div env values)
   (new-number
-   (let loop ((result 0)
-              (v values))
+   (let loop ((result (number->value (i-eval env (pair->car values))))
+              (v (pair->cdr values)))
      (if (eq? (tag v) 'pair)
          (loop (/ result (number->value (i-eval env (pair->car v))))
                (pair->cdr v))
